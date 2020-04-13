@@ -7,10 +7,14 @@ import tensorflow_hub as hub
 import tensorflow_text
 from rq import Queue
 from worker import conn
+import boto3
+import pickle
+import os
 
 model = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual/3")
 itoid = None
 phrase_arr = None
+BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 
 class IntentClassifier(Resource):
 
@@ -34,10 +38,10 @@ class IntentClassifier(Resource):
             intent_id = self.get_intent(payload['value'])
             return {'intent_id':intent_id}
         else:
-            return {'message':'Please fecth phrases from chatbot agent API first.'}
+            return {'message':'Please fetch phrases from chatbot agent API first.'}
 
-def fetch_intents():
-    global itoid, phrase_arr
+def put_on_s3():
+    
     resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
     intents = resp.json()['intents']
     itoid = []
@@ -47,29 +51,39 @@ def fetch_intents():
             itoid.append(phrase['intent_id'])
             phrase_embs.append(model(phrase['value']).numpy())
     phrase_arr = np.vstack(phrase_embs)
-    print('itoid:',itoid)
-    print('phrase_arr.shape:',phrase_arr.shape)
 
-class FetchIntents(Resource):
+    # dump to local
+    pickle.dump(itoid, open('itoid.pkl','wb'))
+    pickle.dump(phrase_arr, open('phrase_arr.pkl','wb'))
+
+    # upload to S3
+    s3_resource = boto3.resource('s3')
+    s3_resource.Object(BUCKET_NAME, 'itoid.pkl').upload_file(Filename='itoid.pkl')
+    s3_resource.Object(BUCKET_NAME, 'phrase_arr.pkl').upload_file(Filename='phrase_arr.pkl')
+    print('uploaded files to S3 succesfully!')
+
+class PutIntentOnS3(Resource):
 
     def get(self):
-        
-        
-        # # get phrase from chatbot agent API
-        # resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
-        # intents = resp.json()['intents']
-        # itoid = []
-        # phrase_embs = []
-        # for intent in intents:
-        #     for phrase in intent['phrases']:
-        #         itoid.append(phrase['intent_id'])
-        #         phrase_embs.append(model(phrase['value']).numpy())
-        # phrase_arr = np.vstack(phrase_embs)
+
         q = Queue(connection=conn)
-        q.enqueue(fetch_intents)
-        # self.fetch_intents(itoid, phrase_arr)
+        q.enqueue(put_on_s3)
         
         return {'message':"Fetch phrases resource called!"}
+
+
+class PullEmbeddingFromS3(Resource):
+
+    def get(self):
+        global bm25_scorer, itoid
+        s3_resource = boto3.resource('s3')
+        print('Downloading from S3...')
+        s3_resource.Object(BUCKET_NAME, 'bm25_scorer.pkl').download_file(f'bm25_scorer.pkl')
+        s3_resource.Object(BUCKET_NAME, 'itoid.pkl').download_file(f'itoid.pkl')
+        # load from local
+        bm25_scorer = pickle.load(open('bm25_scorer.pkl','rb'))
+        itoid = pickle.load(open('itoid.pkl','rb'))
+        return {'message': "fecth result from S3 successfully!"}
 
 def create_app():
     app = Flask(__name__)
@@ -79,7 +93,7 @@ def create_app():
 
 def create_api(app):
     api = Api(app)
-    api.add_resource(FetchIntents, '/fetch_intents')
+    api.add_resource(PutIntentOnS3, '/fetch_intents')
     api.add_resource(IntentClassifier, '/intent_classifier')
 
 app = create_app()
