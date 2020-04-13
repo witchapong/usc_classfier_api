@@ -36,7 +36,8 @@ class IntentClassifier(Resource):
         else:
             return {'message':'Please fecth phrases from chatbot agent API first.'}
 
-def fetch_intents(itod, phase_arr):
+def fetch_intents():
+    global itoid, phrase_arr
     resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
     intents = resp.json()['intents']
     itoid = []
@@ -46,12 +47,14 @@ def fetch_intents(itod, phase_arr):
             itoid.append(phrase['intent_id'])
             phrase_embs.append(model(phrase['value']).numpy())
     phrase_arr = np.vstack(phrase_embs)
+    print('itoid:',itoid)
+    print('phrase_arr.shape:',phrase_arr.shape)
 
 class FetchIntents(Resource):
 
     def get(self):
         
-        global itoid, phrase_arr
+        
         # # get phrase from chatbot agent API
         # resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
         # intents = resp.json()['intents']
@@ -63,7 +66,7 @@ class FetchIntents(Resource):
         #         phrase_embs.append(model(phrase['value']).numpy())
         # phrase_arr = np.vstack(phrase_embs)
         q = Queue(connection=conn)
-        q.enqueue(fetch_intents,itoid, phrase_arr)
+        q.enqueue(fetch_intents)
         # self.fetch_intents(itoid, phrase_arr)
         
         return {'message':"Fetch phrases resource called!"}
