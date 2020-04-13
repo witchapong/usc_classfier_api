@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import tensorflow_hub as hub
 import tensorflow_text
+from rq import Queue
+from worker import conn
 
 model = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual/3")
 itoid = None
@@ -36,9 +38,8 @@ class IntentClassifier(Resource):
 
 class FetchIntents(Resource):
 
-    def get(self):
-        global itoid, phrase_arr
-        # get phrase from chatbot agent API
+    @staticmethod
+    def fetch_intents(itod, phase_arr):
         resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
         intents = resp.json()['intents']
         itoid = []
@@ -48,8 +49,25 @@ class FetchIntents(Resource):
                 itoid.append(phrase['intent_id'])
                 phrase_embs.append(model(phrase['value']).numpy())
         phrase_arr = np.vstack(phrase_embs)
+
+    def get(self):
         
-        return {'message':"Fetch phrases successfully"}
+        global itoid, phrase_arr
+        # # get phrase from chatbot agent API
+        # resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
+        # intents = resp.json()['intents']
+        # itoid = []
+        # phrase_embs = []
+        # for intent in intents:
+        #     for phrase in intent['phrases']:
+        #         itoid.append(phrase['intent_id'])
+        #         phrase_embs.append(model(phrase['value']).numpy())
+        # phrase_arr = np.vstack(phrase_embs)
+        q = Queue(connection=conn)
+        q.enqueue(self.fetch_intents,itoid, phrase_arr)
+        # self.fetch_intents(itoid, phrase_arr)
+        
+        return {'message':"Fetch phrases resource called!"}
 
 def create_app():
     app = Flask(__name__)
