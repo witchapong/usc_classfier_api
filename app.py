@@ -16,6 +16,32 @@ itoid = None
 phrase_arr = None
 BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 
+
+class IntentClassifier(Resource):
+
+    parser = reqparse.RequestParser()
+    parser.add_argument('value',
+        type=str,
+        required=True,
+        help="Sentence to send to chatbot agent cannot be empty."
+        )
+
+    @staticmethod
+    def get_intent(sentence):
+        # global phrase_arrs
+        sent_vec = model(sentence).numpy()
+        sim_score = sent_vec @ phrase_arr.T
+        return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
+
+    def get(self):
+        if phrase_arr is not None:
+            payload = self.__class__.parser.parse_args()
+            intent_id = self.get_intent(payload['value'])
+            return {'intent_id':intent_id}
+        else:
+            return {'message':'Please fetch phrases from chatbot agent API first.'}
+
+
 def put_on_s3():
     
     resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
@@ -61,30 +87,6 @@ class PullFromS3(Resource):
         phrase_arr = pickle.load(open('phrase_arr.pkl','rb'))
         return {'message': "fecth result from S3 successfully!"}
 
-
-class IntentClassifier(Resource):
-
-    parser = reqparse.RequestParser()
-    parser.add_argument('value',
-        type=str,
-        required=True,
-        help="Sentence to send to chatbot agent cannot be empty."
-        )
-
-    @staticmethod
-    def get_intent(sentence):
-        # global phrase_arrs
-        sent_vec = model(sentence).numpy()
-        sim_score = sent_vec @ phrase_arr.T
-        return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
-
-    def get(self):
-        if phrase_arr is not None:
-            payload = self.__class__.parser.parse_args()
-            intent_id = self.get_intent(payload['value'])
-            return {'intent_id':intent_id}
-        else:
-            return {'message':'Please fetch phrases from chatbot agent API first.'}
 
 def create_app():
     app = Flask(__name__)
