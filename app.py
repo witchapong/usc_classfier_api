@@ -30,7 +30,9 @@ class IntentClassifier(Resource):
     def get_intent(sentence):
         # global phrase_arrs
         sent_vec = model(sentence).numpy()
+        print('sent_vec.shape:',sent_vec.shape)
         sim_score = sent_vec @ phrase_arr.T
+        print('sim_score.shape:',sent_vec.shape)
         return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
 
     def get(self):
