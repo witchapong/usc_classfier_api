@@ -26,14 +26,14 @@ class IntentClassifier(Resource):
         help="Sentence to send to chatbot agent cannot be empty."
         )
 
+    # Heroku crashed at this method
     @staticmethod
     def get_intent(sentence):
         # global phrase_arrs
-        sent_vec = model(sentence).numpy()
-        print('sent_vec.shape:',sent_vec.shape)
-        sim_score = sent_vec @ phrase_arr.T
-        print('sim_score.shape:',sent_vec.shape)
-        return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
+        # sent_vec = model(sentence).numpy()
+        # sim_score = sent_vec @ phrase_arr.T
+        # return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
+        return {'message':'Bingo!'}
 
     def get(self):
         if phrase_arr is not None:
