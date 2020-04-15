@@ -29,8 +29,8 @@ class IntentClassifier(Resource):
     # Heroku crashed at this method
     @staticmethod
     def get_intent(sentence):
-        # global phrase_arrs
-        # sent_vec = model(sentence).numpy()
+        global phrase_arrs
+        sent_vec = model(sentence).numpy()
         # sim_score = sent_vec @ phrase_arr.T
         # return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
         return {'message':'Bingo!'}
