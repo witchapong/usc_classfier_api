@@ -7,6 +7,7 @@ import tensorflow_hub as hub
 import tensorflow_text
 from rq import Queue
 from worker import conn
+from bg_task import put_on_s3
 import boto3
 import pickle
 import os
@@ -31,9 +32,9 @@ class IntentClassifier(Resource):
     def get_intent(sentence):
         global phrase_arrs
         sent_vec = model(sentence).numpy()
-        # sim_score = sent_vec @ phrase_arr.T
-        # return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
-        return {'message':'Bingo!'}
+        sim_score = sent_vec @ phrase_arr.T
+        return int(pd.DataFrame({'intent_id':itoid, 'score':sim_score.squeeze()}).groupby('intent_id').sum().idxmax()['score'])
+        # return {'message':'Bingo!'}
 
     def get(self):
         if phrase_arr is not None:
@@ -43,28 +44,6 @@ class IntentClassifier(Resource):
         else:
             return {'message':'Please fetch phrases from chatbot agent API first.'}
 
-
-def put_on_s3():
-    
-    resp = requests.get('https://simple-chatbot-api.herokuapp.com/intents')
-    intents = resp.json()['intents']
-    itoid = []
-    phrase_embs = []
-    for intent in intents:
-        for phrase in intent['phrases']:
-            itoid.append(phrase['intent_id'])
-            phrase_embs.append(model(phrase['value']).numpy())
-    phrase_arr = np.vstack(phrase_embs)
-
-    # dump to local
-    pickle.dump(itoid, open('itoid.pkl','wb'))
-    pickle.dump(phrase_arr, open('phrase_arr.pkl','wb'))
-
-    # upload to S3
-    s3_resource = boto3.resource('s3')
-    s3_resource.Object(BUCKET_NAME, 'itoid.pkl').upload_file(Filename='itoid.pkl')
-    s3_resource.Object(BUCKET_NAME, 'phrase_arr.pkl').upload_file(Filename='phrase_arr.pkl')
-    print('uploaded files to S3 succesfully!')
 
 class PutOnS3(Resource):
 
