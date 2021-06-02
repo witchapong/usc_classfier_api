@@ -52,7 +52,7 @@ tensorflow-text==2.0.1
 termcolor==1.1.0
 tinydb==3.15.2
 tqdm==4.45.0
-urllib3==1.25.8
+urllib3==1.26.5
 uWSGI==2.0.18
 Werkzeug==1.0.1
 wrapt==1.12.1
